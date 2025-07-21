@@ -37,10 +37,9 @@ app.post("/signup", async (req, res) => {
     const connection = await getConnection();
 
     // Check if username already exists
-    const [existingUsers] = await connection.execute(
-      "SELECT username FROM users WHERE username = ?",
-      [username]
-    );
+    const [existingUsers] = await connection.execute("SELECT username FROM users WHERE username = ?", [
+      username,
+    ]);
 
     if (existingUsers.length > 0) {
       return res.status(409).json({ error: "Username already exists" });
@@ -50,18 +49,58 @@ app.post("/signup", async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
     // Insert new user into database
-    await connection.execute(
-      "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-      [username, hashedPassword]
-    );
+    await connection.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", [
+      username,
+      hashedPassword,
+    ]);
 
-    res.status(201).json({ 
+    res.status(201).json({
       message: "Analyst registered successfully",
-      username: username 
+      username: username,
     });
-
   } catch (error) {
     console.error("Signup error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// 2. Verify endpoint - Password Checkpoint
+app.post("/verify", async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    // Validate input
+    if (!username || !password) {
+      return res.status(400).json({ error: "Username and password are required" });
+    }
+
+    // Get database connection
+    const connection = await getConnection();
+
+    // Get user from database
+    const [users] = await connection.execute("SELECT username, password_hash FROM users WHERE username = ?", [
+      username,
+    ]);
+
+    if (users.length === 0) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const user = users[0];
+
+    // Compare password with stored hash
+    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    // Mark user as verified in memory
+    verifiedUsers[username] = true;
+
+    res.status(200).json({ message: "Verified" });
+  } catch (error) {
+    console.error("Verify error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });
