@@ -1,6 +1,6 @@
-# Cipher Gate - CipherNet Authentication Service
+# Cipher Gate - CipherNet Authentication Service v2.0
 
-A secure backend authentication system for CipherNet intelligence analysts. The service provides user registration, authentication, and secure message analysis capabilities.
+A secure backend authentication system for CipherNet intelligence analysts. The service provides user registration, authentication, and secure message analysis capabilities with a professional modular architecture.
 
 ## Features
 
@@ -8,6 +8,40 @@ A secure backend authentication system for CipherNet intelligence analysts. The 
 - **Authentication Verification**: Credential validation with secure password comparison  
 - **Message Analysis**: Cipher analysis with trap detection (ascending order check)
 - **Middleware Authentication**: Reusable authentication middleware for protected routes
+- **Modular Architecture**: Organized with controllers, middleware, routes, and utilities
+- **Environment Configuration**: Flexible configuration with .env support
+- **Error Handling**: Comprehensive error handling and logging
+- **Input Validation**: Advanced input validation and sanitization
+
+## Project Structure
+
+```
+cipher-gate/
+├── src/
+│   ├── app.js                 # Express app configuration
+│   ├── config/
+│   │   ├── config.js          # Environment configuration
+│   │   └── database.js        # Database connection
+│   ├── controllers/
+│   │   ├── authController.js  # Authentication logic
+│   │   └── cipherController.js # Cipher analysis logic
+│   ├── middleware/
+│   │   ├── auth.js            # Authentication middleware
+│   │   └── general.js         # General middleware (error, logging)
+│   ├── routes/
+│   │   ├── index.js           # Main router
+│   │   ├── auth.js            # Authentication routes
+│   │   └── cipher.js          # Cipher routes
+│   └── utils/
+│       ├── cipherUtils.js     # Cipher utility functions
+│       └── validation.js      # Input validation utilities
+├── database/
+│   └── setup.sql              # Database schema
+├── server.js                  # Server entry point
+├── .env.example               # Environment variables example
+├── .env                       # Environment variables (ignored by git)
+└── README.md                  # Documentation
+```
 
 ## Prerequisites
 
@@ -23,11 +57,17 @@ A secure backend authentication system for CipherNet intelligence analysts. The 
 npm install
 ```
 
-3. Set up the database:
+3. Set up environment variables:
+```bash
+cp .env.example .env
+# Edit .env with your database configuration
+```
+
+4. Set up the database:
    - Start MySQL (via XAMPP or standalone)
    - Import the database schema from `database/setup.sql`
 
-4. Start the server:
+5. Start the server:
 ```bash
 npm run dev  # Development mode with auto-restart
 npm start    # Production mode
@@ -53,8 +93,51 @@ CREATE TABLE IF NOT EXISTS users (
 
 ## API Endpoints
 
-### 1. Analyst Registration
+### Legacy Endpoints (Backward Compatibility)
+
+#### 1. Analyst Registration
 **POST** `/signup`
+
+#### 2. Password Verification  
+**POST** `/verify`
+
+#### 3. Message Analysis
+**POST** `/decode-message`
+
+#### 4. Analyst Profile
+**GET** `/profile`
+
+### New API Endpoints (v2.0)
+
+#### Health Check
+**GET** `/api/health`
+
+Check service status and health.
+
+**Response (200):**
+```json
+{
+  "status": "OK",
+  "message": "CipherNet Authentication Service Online",
+  "timestamp": "2025-07-21T10:30:00.000Z",
+  "version": "2.0.0"
+}
+```
+
+#### Authentication Routes
+
+**POST** `/api/auth/signup` - Register a new analyst
+**POST** `/api/auth/verify` - Verify analyst credentials
+
+#### Cipher Routes (Protected)
+
+**POST** `/api/cipher/decode-message` - Analyze encrypted messages
+**GET** `/api/cipher/profile` - Get analyst profile
+
+### Request/Response Examples
+
+#### 1. Analyst Registration
+**POST** `/signup` or `/api/auth/signup`
 
 Register a new analyst with secure password hashing.
 
@@ -152,9 +235,21 @@ Access analyst profile information (requires authentication via middleware).
 
 ### Using curl:
 
-1. **Register a new analyst:**
+0. **Health check:**
+```bash
+curl -X GET http://localhost:3000/api/health
+```
+
+1. **Register a new analyst (Legacy):**
 ```bash
 curl -X POST http://localhost:3000/signup \
+  -H "Content-Type: application/json" \
+  -d '{"username": "noa", "password": "secure123"}'
+```
+
+1b. **Register a new analyst (New API):**
+```bash
+curl -X POST http://localhost:3000/api/auth/signup \
   -H "Content-Type: application/json" \
   -d '{"username": "noa", "password": "secure123"}'
 ```
@@ -166,9 +261,16 @@ curl -X POST http://localhost:3000/verify \
   -d '{"username": "noa", "password": "secure123"}'
 ```
 
-3. **Analyze legitimate message:**
+3. **Analyze legitimate message (Legacy):**
 ```bash
 curl -X POST http://localhost:3000/decode-message \
+  -H "Content-Type: application/json" \
+  -d '{"username": "noa", "password": "secure123", "message": [1, 3, 4, 9]}'
+```
+
+3b. **Analyze legitimate message (New API):**
+```bash
+curl -X POST http://localhost:3000/api/cipher/decode-message \
   -H "Content-Type: application/json" \
   -d '{"username": "noa", "password": "secure123", "message": [1, 3, 4, 9]}'
 ```
@@ -187,27 +289,9 @@ curl -X GET http://localhost:3000/profile \
   -d '{"username": "noa", "password": "secure123"}'
 ```
 
-## Security Features
-
-- **bcrypt Password Hashing**: All passwords are securely hashed with salt rounds
-- **SQL Injection Protection**: Parameterized queries prevent SQL injection
-- **Input Validation**: Comprehensive validation for all endpoints
-- **Middleware Authentication**: Reusable authentication for protected routes
-
 ## Architecture
 
 - **Express.js**: Web framework for API endpoints
 - **MySQL2**: Database connectivity with promise support
 - **bcrypt**: Secure password hashing
 - **Middleware Pattern**: Clean separation of authentication logic
-
-## Development Branches
-
-The project was developed using a feature branch workflow:
-
-- `feature/signup-endpoint`: User registration functionality
-- `feature/verify-endpoint`: Password verification system
-- `feature/decode-message-endpoint`: Message analysis capabilities
-- `feature/middleware-auth`: Authentication middleware implementation
-
-Each feature was developed, tested, and merged separately for clean commit history.
