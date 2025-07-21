@@ -33,6 +33,49 @@ function calculateSum(arr) {
   return sum;
 }
 
+// Middleware function for password verification
+async function verifyPasswordMiddleware(req, res, next) {
+  try {
+    const { username, password } = req.body;
+
+    // Validate input
+    if (!username || !password) {
+      return res.status(400).json({ error: "Username and password are required for protected routes" });
+    }
+
+    // Get database connection
+    const connection = await getConnection();
+
+    // Get user from database
+    const [users] = await connection.execute(
+      "SELECT username, password_hash FROM users WHERE username = ?",
+      [username]
+    );
+
+    if (users.length === 0) {
+      return res.status(401).json({ error: "Unauthorized - user not found" });
+    }
+
+    const user = users[0];
+
+    // Compare password with stored hash
+    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: "Unauthorized - invalid credentials" });
+    }
+
+    // Add user info to request object for use in route handlers
+    req.user = { username: user.username };
+    
+    next();
+
+  } catch (error) {
+    console.error("Authentication middleware error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
 // Test route
 app.get("/", (req, res) => {
   res.json({ message: "CipherNet Authentication Service Online" });
@@ -124,30 +167,27 @@ app.post("/verify", async (req, res) => {
   }
 });
 
-// 3. Decode-message endpoint - Cipher Analysis
-app.post("/decode-message", (req, res) => {
+// 3. Decode-message endpoint - Cipher Analysis (with middleware)
+app.post("/decode-message", verifyPasswordMiddleware, (req, res) => {
   try {
-    const { username, message } = req.body;
+    const { message } = req.body;
+    const { username } = req.user;
 
-    // Validate input
-    if (!username || !message) {
-      return res.status(400).json({ error: "Username and message are required" });
+    // Validate message input
+    if (!message) {
+      return res.status(400).json({ error: "Message is required" });
     }
 
     if (!Array.isArray(message)) {
       return res.status(400).json({ error: "Message must be an array of integers" });
     }
 
-    // Check if user is verified
-    if (!verifiedUsers[username]) {
-      return res.status(401).json({ error: "Analyst not verified. Please verify credentials first." });
-    }
-
     // Check if message is a trap (not in ascending order)
     if (!isAscendingOrder(message)) {
       return res.status(200).json({ 
         result: -1,
-        status: "Trap detected - message is not in ascending order"
+        status: "Trap detected - message is not in ascending order",
+        analyst: username
       });
     }
 
@@ -156,13 +196,25 @@ app.post("/decode-message", (req, res) => {
     
     res.status(200).json({ 
       result: sum,
-      status: "Legit message decoded successfully"
+      status: "Legit message decoded successfully",
+      analyst: username
     });
 
   } catch (error) {
     console.error("Decode-message error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
+});
+
+// Protected route example - Analyst profile (demonstrates middleware reusability)
+app.get("/profile", verifyPasswordMiddleware, (req, res) => {
+  const { username } = req.user;
+  
+  res.status(200).json({ 
+    message: "Analyst profile accessed successfully",
+    analyst: username,
+    access_level: "Verified CipherNet Analyst"
+  });
 });
 
 // Start server
